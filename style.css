@@ -1,0 +1,210 @@
+@charset "utf-8";
+/* CSS Document */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --primary-color: #1F1F1F;         /* Deep dark background */
+  --secondary-color: #333333;       /* Slightly lighter dark shade */
+  --accent-color: #BB86FC;          /* Vibrant purple accent */
+  --light-color: #E0E0E0;           /* For subtle text and highlights */
+  --text-color: #F5F5F5;            /* Near white text */
+  --shadow-color: rgba(0, 0, 0, 0.5);
+  --transition-speed: 0.3s;
+  --font-family: 'Poppins', sans-serif;
+}
+
+body {
+  background-color: var(--primary-color);
+  color: var(--text-color);
+  font-family: var(--font-family);
+  line-height: 1.6;
+}
+
+/* Header */
+header {
+  background: var(--secondary-color);
+  padding: 1.5rem 2rem;
+  text-align: center;
+  color: var(--text-color);
+}
+
+header h1 {
+  font-size: 2.5rem;
+  font-weight: 600;
+}
+
+/* Navigation */
+nav {
+  position: sticky;
+  top: 0;
+  background: var(--secondary-color);
+  opacity: 0.95;
+  box-shadow: 0 2px 4px var(--shadow-color);
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem 0;
+  z-index: 1000;
+}
+
+nav a {
+  position: relative;
+  overflow: hidden;
+  color: var(--text-color);
+  text-decoration: none;
+  margin: 0 1rem;
+  opacity: 1;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem; /* Rounded corners applied at all times */
+  transition: background-color var(--transition-speed), color var(--transition-speed);
+  z-index: 1000;
+}
+
+nav a:hover {
+  background-color: var(--accent-color);
+}
+
+.email {
+  color: var(--accent-color);
+  display: inline;
+}
+
+.intro {
+  background: url('https://via.placeholder.com/1500x600') center/cover no-repeat;
+  position: relative;
+  height: 60vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: var(--text-color);
+}
+
+.intro p {
+  font-size: 1rem;
+  max-width: 800px;
+  margin: 0 auto 2rem;
+}
+
+  
+    
+/* Hero Section */
+.hero {
+  background: url('https://via.placeholder.com/1500x600') center/cover no-repeat;
+  position: relative;
+  height: 60vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  color: var(--text-color);
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.6);
+  z-index: 1;
+}
+
+.hero > * {
+  position: relative;
+  z-index: 2;
+}
+
+.hero h2 {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.hero p {
+  font-size: 1.25rem;
+  max-width: 800px;
+  margin: 0 auto 2rem;
+}
+
+.hero .btn {
+  background: var(--accent-color);
+  color: var(--primary-color);
+  padding: 0.75rem 1.5rem;
+  text-decoration: none;
+  border-radius: 0.5rem;
+  transition: background var(--transition-speed);
+  font-weight: 500;
+}
+
+.hero .btn:hover {
+  background: var(--secondary-color);
+}
+
+/* Main Content Section using CSS Grid */
+.projects {
+  padding: 3rem 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(40%, 1fr));
+  gap: 20px;
+}
+
+.projects >* {
+  margin-bottom: 30px;
+}
+
+.card {
+  text-decoration: none;
+  background: var(--secondary-color);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px var(--shadow-color);
+  transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 10px var(--shadow-color);
+}
+
+.card h3 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--accent-color);
+}
+
+.card p {
+  font-size: 1rem;
+  color: var(--light-color);
+}
+
+/* Footer */
+footer {
+  background: var(--secondary-color);
+  color: var(--light-color);
+  text-align: center;
+  padding: 1rem 0;
+  margin-top: 3rem;
+  font-size: 0.9rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  header h1 {
+    font-size: 2rem;
+  }
+  .hero h2 {
+    font-size: 2.5rem;
+  }
+  .hero p {
+    font-size: 1rem;
+  }
+}
