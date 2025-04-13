@@ -25,6 +25,10 @@ body {
   line-height: 1.6;
 }
 
+.content {
+  margin-bottom: 80px;
+}
+
 /* Header */
 header {
   background: var(--secondary-color);
@@ -69,9 +73,13 @@ nav a:hover {
   background-color: var(--accent-color);
 }
 
-.email {
+.highlight {
   color: var(--accent-color);
   display: inline;
+}
+
+a .highlight {
+  text-decoration: none;
 }
 
 .intro {
@@ -157,7 +165,7 @@ nav a:hover {
 }
 
 .projects >* {
-  margin-bottom: 30px;
+  margin-bottom: 10px;
 }
 
 .card {
@@ -191,9 +199,14 @@ footer {
   background: var(--secondary-color);
   color: var(--light-color);
   text-align: center;
-  padding: 1rem 0;
+  /*padding: 1rem 0;*/
   margin-top: 3rem;
   font-size: 0.9rem;
+  
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  padding: 10px;
 }
 
 /* Responsive Adjustments */
