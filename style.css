@@ -73,13 +73,9 @@ nav a:hover {
   background-color: var(--accent-color);
 }
 
-.highlight {
-  color: var(--accent-color);
-  display: inline;
-}
 
-.intro {
-  background: url('https://via.placeholder.com/1500x600') center/cover no-repeat;
+
+.text {
   position: relative;
   height: 60vh;
   display: flex;
@@ -89,7 +85,12 @@ nav a:hover {
   color: var(--text-color);
 }
 
-.intro p {
+.highlight {
+  color: var(--accent-color);
+  display: inline;
+}
+
+.text p {
   font-size: 1rem;
   max-width: 800px;
   margin: 0 auto 2rem;
@@ -99,7 +100,6 @@ nav a:hover {
     
 /* Hero Section */
 .hero {
-  background: url('https://via.placeholder.com/1500x600') center/cover no-repeat;
   position: relative;
   height: 60vh;
   display: flex;
