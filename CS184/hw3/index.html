@@ -1,0 +1,653 @@
+<html>
+<head>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=default'></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+    <style>
+        h1 {
+            text-align: center;
+        }
+
+        .container {
+            margin: 0 auto;
+            padding: 60px 20%;
+        }
+
+        figure {
+            text-align: center;
+        }
+
+        img {
+            display: inline-block;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        img {
+            image-rendering: pixelated;
+        }
+
+    </style>
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CS184/284A Spring 2025 Homework 3 Write-Up</h1>
+        <div style="text-align: center;">Names: Carl</div>
+
+        <br>
+
+        Link to webpage: (TODO) <a href="https://cs184.eecs.berkeley.edu/sp25">cs184.eecs.berkeley.edu/sp25</a>
+        <br>
+        Link to GitHub repository: (TODO) <a href="https://cs184.eecs.berkeley.edu/sp25">cs184.eecs.berkeley.edu/sp25</a>
+
+        <!--
+    We've already added one heading per part, to make your write-up as navigable when grading. Please fit your write-up within these sections!
+    -->
+
+        <h2>Overview</h2>
+        <p>
+            In this assignment, we build a physically-based path tracing algorithm to generate realistic images by solving the rendering equation using monte carlo estimation.
+            Starting from ray generation and intersection with primitive shapes, we implemented bounding volume hierarchy to accelerate ray-scene intersection.
+            Then, we implemented one level of ray tracing, or direct illumination, by performing hemisphere based or lighting based sampling.
+            Using direct illumination, we recursively sample rays to implement the full global illumination, and finally we perform the final optimization by implementing Russian roulette termination with adaptive sampling.
+        </p>
+
+
+        <h2>Part 1: Ray Generation and Scene Intersection</h2>
+        <p>
+            In this part, we start the entire process of ray tracing with the basic ray generation and primitive intersection.
+            This is where everything begins, and later on, we will optimize this process and also compute all the light information.
+        </p>
+        <p>
+            To begin, we generate one ray for each pixel, starting from the camera position to the corresponding world location of each pixel on the screen.
+            In screen space, each pixel is specified by a point \((x,y)\) where \(x,y\) are both within \([0,1]\).
+            Then, in camera space, the camera is positioned at the origin, and the screen is positioned at the \(z=-1\) plane with the edge of the screen being \(x=\pm\tan(\text{hFov}/2)\) and \(y=\pm\tan(\text{vFov}/2)\).
+            Once we translate the pixel to camera space, we can construct the ray in camera space and translate it back to world space with the transformation we already know how to do.
+        </p>
+        <p>
+            Then, we need to calculate the intersection of rays with primitive shapes, such as triangles and spheres.
+        </p>
+        <p>
+            For ray and triangle intersection, we used Möller Trumbore Algorithm.
+            In this algorithm, we incoperate the ray equation into the calculation of the barycentric coordinate, then we check through the barycentric coordinate whether it is inside the triangle.
+            Specifically, we solve the following equation:
+            \[\vec{O}+t\vec{D}=w\vec{P_1}+u\vec{P_2}+v\vec{P_3},\]
+            where \(\vec{O}\) is the start of the ray, \(\vec{D}\) is the direction of the ray, \(\vec{P_1},\vec{P_2},\vec{P_3}\) are the three points of the triangle, and \(u,v,w\) are clearly the barycentric coordinate of the intersection of the ray with the plane defined by the three points, with the obvious constraint \(u+v+w=1\).
+            Substituting this in, we have
+            \[\vec{O}+t\vec{D}=(1-u-v)\vec{P_1}+u\vec{P_2}+v\vec{P_3}=\vec{P_1}+u(\vec{P_2}-\vec{P_1})+v(\vec{P_3}-\vec{P_1}).\]
+            Then, rearranging he unknowns to the left hand side, we have
+            \[t\vec{D}-u(\vec{P_2}-\vec{P_1})-v(\vec{P_3}-\vec{P_1})=\vec{P_1}-\vec{O}.\]
+            Solving this linear system of equations, we obtain
+            \[\begin{bmatrix}t\\u\\v\end{bmatrix}=\frac{1}{\vec{S}_1\cdot\vec{E}_1}\begin{bmatrix}\vec{S}_2\cdot\vec{E}_2\\\vec{S}_1\cdot\vec{S}\\ \vec{S}_2\cdot\vec{D}\end{bmatrix}\]
+            where
+            \[E_1=P_2-P_1,\quad E_2=P_3-P_1,\quad\vec{S}=\vec{O}-\vec{P}_1,\quad \vec{S}_1=\vec{D}\times\vec{E}_2,\quad\vec{S}_2=\vec{S}\times\vec{E}_1.\]
+            With all of these values computed, we can test if the ray intersected the triangle by testing whether \(0\leq u\leq 1\), \(0\leq v\leq 1\), and \(0\leq 1-u-v\leq1\).
+        </p>
+        <p>
+            Then, when we're writing the code, we can make some small optimization, and also need to watch out for some boundary cases.
+            First of all, if \(\vec{S}_1\cdot\vec{E}_1=0\) (or smaller than some epsilon), then this means that the ray direction is parallel to the plane defined by the points of the triangle, in which case we should just return false.
+            Then, since we have to calculate \(u\) and \(v\) one by one, we can make an early exit if \(u\) is not within \([0,1]\), and \(v\) is not within \([0,1-u]\).
+            Lastly, the normal of the intersection can be obtained by interpolating the vertex normals using the barycentric coordinates \(u,v,1-u-v\) we calculated.
+        </p>
+        <p>
+            For sphere and ray intersection, it proceed with a similar algebraic approach.
+            Suppose the sphere has center \(\vec{C}\) and radius \(R\), then the sphere is defined by \((\vec{X}-\vec{C})\cdot(\vec{X}-\vec{C})=R^2\).
+            Substituting in the ray equation, we have \((\vec{O}+t\vec{D}-\vec{C})\cdot(\vec{O}+t\vec{D}-\vec{C})=R^2\), which simplifies to
+            \[(\vec{D}\cdot\vec{D})t^2+(2(\vec{O}-\vec{C})\cdot\vec{D})t+(\vec{O}-\vec{C})\cdot(\vec{O}-\vec{C})-R^2=0.\]
+            This is a quadratic equation in \(t\), which we can solve using the quadratic formula.
+        </p>
+        <p>
+            With ray generation and primitive intersection that returns the material and the normal, we are able to get the following images:
+        </p>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">
+                        <img src="images/simplenormalshadings/CBsphere_lambertian.png" width="300px" />
+                    </td>
+                    <td style="text-align: center;">
+                        <img src="images/simplenormalshadings/cube.png" width="300px" />
+                    </td>
+                    <td style="text-align: center;">
+                        <img src="images/simplenormalshadings/plane.png" width="300px" />
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+
+
+        <h2>Part 2: Bounding Volume Hierarchy</h2>
+        <p>
+            As we can already see from loading meshes with slightly more triangles that the above code is really slow.
+            This is due to fact that we are testing every ray against primitive, which is wasteful since the ray is clearly far away from the primitive in majority of the situations.
+            Thus, we need a better way to filter out large groups of primitive, and this is what bounding volume hierarchy (BVH) does.
+        </p>
+        <p>
+            Our BVH construction is as follows: first we compute the bounding boxes of all the objects, then we choose the direction that has the largest corresponding length for the bounding box.
+            Then, we split this direction exactly at the centroid of the overall bounding box, and we group each object to the left child or the right child depending on whether the centroid of the bounding box is to the left or the right of the split.
+            Lastly, we recursively build the BVH on the left child and the right child.
+        </p>
+        <p>
+            Some implementation details, each BVH node stores a list of primitives by storing the start and end C++ iterators <code>vector&lt;Primitive *&gt;::iterator</code> in a larger array, so this way it's much more memory efficient.
+            Then, each time we are given the start and end of primitive iterators, we have to reorder the primitives so that the list for the left child are consecutive, and similarly for the right child.
+            For this, we simply define an anonymous lambda function that decides whether a primitive should belong in the left or right child, and we call the standard algorithm <code>std::stable_partition</code> to reorder the vector.
+        </p>
+        <p>
+            With the BVH construction implemented, we see a significant speedup in rendering, and we are now able to render much larger scenes:
+        </p>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">
+                        <img src="images/normalshadings/banana.png" width="300px" />
+                        <figcaption>Banana</figcaption>
+                    </td>
+                    <td style="text-align: center;">
+                        <img src="images/normalshadings/beast.png" width="300px" />
+                        <figcaption>Beast</figcaption>
+                    </td>
+                    <td style="text-align: center;">
+                        <img src="images/normalshadings/beetle.png" width="300px" />
+                        <figcaption>Beetle</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">
+                        <img src="images/normalshadings/bench.png" width="300px" />
+                        <figcaption>Bench</figcaption>
+                    </td>
+                    <td style="text-align: center;">
+                        <img src="images/normalshadings/building.png" width="300px" />
+                        <figcaption>Building</figcaption>
+                    </td>
+                    <td style="text-align: center;">
+                        <img src="images/normalshadings/cow.png" width="300px" />
+                        <figcaption>Cow</figcaption>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">
+                        <img src="images/normalshadings/maxplanck.png" width="300px" />
+                        <figcaption>Max Planck</figcaption>
+                    </td>
+                    <td style="text-align: center;">
+                        <img src="images/normalshadings/peter.png" width="300px" />
+                        <figcaption>Peter</figcaption>
+                    </td>
+                    <td style="text-align: center;">
+                        <img src="images/normalshadings/teapot.png" width="300px" />
+                        <figcaption>Teapot</figcaption>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <p>
+            For a speed comparison, we tested all of these with the original loop and with BVH:
+        </p>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">File</td>
+                    <td style="text-align: center;">Original time (s)</td>
+                    <td style="text-align: center;">Test per ray</td>
+                    <td style="text-align: center;">Optimized time (s)</td>
+                    <td style="text-align: center;">Test per ray</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Banana</td>
+                    <td style="text-align: center;">6.8068</td>
+                    <td style="text-align: center;">2458</td>
+                    <td style="text-align: center;">0.308</td>
+                    <td style="text-align: center;">6.46436</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">building</td>
+                    <td style="text-align: center;">1664.9704</td>
+                    <td style="text-align: center;">39506</td>
+                    <td style="text-align: center;">0.523</td>
+                    <td style="text-align: center;">5.964217</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">teapot</td>
+                    <td style="text-align: center;">6.3835</td>
+                    <td style="text-align: center;">2464</td>
+                    <td style="text-align: center;">0.3096</td>
+                    <td style="text-align: center;">7.172744</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">cow</td>
+                    <td style="text-align: center;">64.0496</td>
+                    <td style="text-align: center;">5856</td>
+                    <td style="text-align: center;">0.3623</td>
+                    <td style="text-align: center;">4.856798</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">beetle</td>
+                    <td style="text-align: center;">110.1838</td>
+                    <td style="text-align: center;">7558</td>
+                    <td style="text-align: center;">0.2899</td>
+                    <td style="text-align: center;">4.575783</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">beast</td>
+                    <td style="text-align: center;">2875.321</td>
+                    <td style="text-align: center;">64618</td>
+                    <td style="text-align: center;">0.3632</td>
+                    <td style="text-align: center;">2.056885</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">maxplanck</td>
+                    <td style="text-align: center;">2275.7349</td>
+                    <td style="text-align: center;">50801</td>
+                    <td style="text-align: center;">0.5132</td>
+                    <td style="text-align: center;">5.361781</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">peter</td>
+                    <td style="text-align: center;">1823.7381</td>
+                    <td style="text-align: center;">40018</td>
+                    <td style="text-align: center;">0.4072</td>
+                    <td style="text-align: center;">3.097142</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">bench</td>
+                    <td style="text-align: center;">3176.3173</td>
+                    <td style="text-align: center;">67808</td>
+                    <td style="text-align: center;">0.2241</td>
+                    <td style="text-align: center;">1.476285</td>
+                </tr>
+            </table>
+        </div>
+        <p>
+            As we can see, without BVH, we need to test each ray against every primitive in the scene.
+            However, with BVH, the number of test per ray decreases significantly to depend on the scene specifically rather than the number of primitive.
+        </p>
+
+
+
+
+
+        <h2>Part 3: Direct Illumination</h2>
+        In this section, we implemented two algorithms for direct illumination, or simulating exactly one bounce of the light ray.
+        The goal of realistic rendering is to estimate the amount of radiance leaving \(P\) in the direction \(D\), and in this section, we do so by computing the first order contribution, i.e. radiance that leaves an emissive material, bounces at \(P\) and leaves in the direction \(D\).
+        <p>
+            Our first method is the most naive and resembles how light works.
+            Specifically, we assume that light might come from any direction in the hemisphere, so we sample a random direction \(D'\) uniformly in the hemisphere located at \(P\) rotated towards the normal at \(P\).
+            Then, we test the intersection of a ray originating from \(P\) in the direction \(D'\), and sample the emission \(L\) of the intersection, if any exist.
+            This is basically simulating a light ray leaving the intersection, traveling in the direction of \(-D'\), bounces at \(P\) and leaves in the direction \(D\).
+            Then, with this emission, the contribution to our final radiance is \(L\cdot f(-D'\to D)\cos(\theta)\cdot2\pi\), where \(f\) is the bidirectional scattering distribution function of the material at \(P\), \(\theta\) is the angle of \(D'\) with the normal at \(P\), and the \(2\pi\) is the normalization term due to the density of the hemisphere being \(1/2\pi\).
+        </p>
+        <p>
+            The above algorithm is intuitively clear and easy to implement, however it needs a large number of samples to converge to something smooth.
+            Thus, an alternative is to sample based on actual light.
+            Specifically, we sample a random direction from the light to the point \(P\), and see if the ray from the light to \(P\) is blocked by another object.
+            If it's not blocked, then we include the radiance, otherwise we don't include anything.
+            This needs slightly more work, since we need to implement different sampling functions and probability density function calculations for different types of light, but the convergence speed is much higher, as it's a form of importance sampling: we only sample locations that might contribute to the final estimation.
+            This is also the same as doing a change of variable for the integral that we are estimating.
+        </p>
+        <p>
+            Here are some comparison of scenes rendered using both methods.
+            For each pair image, we rendered the same scene with 64 samples per pixel.
+        </p>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">Scene name</td>
+                    <td style="text-align: center;">Spheres inside cornell box</td>
+                    <td style="text-align: center;">Coil inside cornell box</td>
+                    <td style="text-align: center;">Bunny inside cornell box</td>
+                    <td style="text-align: center;">Dragon inside cornell box</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Hemisphere sampling</td>
+                    <td style="text-align: center;"><img src="images/lightmethodcomparison/sphere_h64.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightmethodcomparison/coil_h64.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightmethodcomparison/bunny_h64.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightmethodcomparison/dragon_h64.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Lighting sampling (importance sampling)</td>
+                    <td style="text-align: center;"><img src="images/lightmethodcomparison/sphere_d64.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightmethodcomparison/coil_d64.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightmethodcomparison/bunny_d64.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightmethodcomparison/dragon_d64.png" width="300px" /></td>
+                </tr>
+            </table>
+        </div>
+
+        <p>
+            Another parameter we can tune is the number of sample per light, meaning how many samples per ray we test for light shading.
+        </p>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">Number of samples</td>
+                    <td style="text-align: center;">1</td>
+                    <td style="text-align: center;">4</td>
+                    <td style="text-align: center;">16</td>
+                    <td style="text-align: center;">64</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Rendered image</td>
+                    <td style="text-align: center;"><img src="images/lightareacount/s1.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightareacount/s4.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightareacount/s16.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightareacount/s64.png" width="300px" /></td>
+                </tr>
+            </table>
+        </div>
+
+        <p>
+            Now, to compare the hemisphere sampling with lighting sampling, we rendered the same scene with increasing number of samples per pixel.
+        </p>
+
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">Sample per pixel</td>
+                    <td style="text-align: center;">Hemisphere sampling</td>
+                    <td style="text-align: center;">Lighting sampling (importance sampling)</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">1</td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/h1.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/d1.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">2</td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/h2.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/d2.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">4</td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/h4.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/d4.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">8</td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/h8.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/d8.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">16</td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/h16.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/d16.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">32</td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/h32.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/d32.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">64</td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/h64.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/lightingmethodsamplecount/d64.png" width="300px" /></td>
+                </tr>
+            </table>
+        </div>
+        <p>
+            As we can see, lighting sampling converges a lot faster than hemisphere sampling, as with 64 samples, the shadow is already really smooth, whereas hemisphere sampling is still really noisy with mant black pixels.
+            Another difference is that, for areas that aren't in the shadow, lighting sampling will always be bright even with one pixel, whereas the scene is barely comprehensible for hemisphere sampling with one sample per pixel.
+        </p>
+
+        <h2>Part 4: Global Illumination</h2>
+        Here are some scenes rendered with 5 bounces and 1024 samples per pixel, and we have also decomposed them into the direct and indirect illuminations:
+
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">Scene</td>
+                    <td style="text-align: center;">Direct</td>
+                    <td style="text-align: center;">Indirect</td>
+                    <td style="text-align: center;">Global</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Spheres</td>
+                    <td style="text-align: center;"><img src="images/directs/spheres.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/indirects/spheres.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/global/spheres.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Coil</td>
+                    <td style="text-align: center;"><img src="images/directs/coil.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/indirects/coil.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/global/coil.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Bunny</td>
+                    <td style="text-align: center;"><img src="images/directs/bunny.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/indirects/bunny.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/global/bunny.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Dragon</td>
+                    <td style="text-align: center;"><img src="images/directs/dragon.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/indirects/dragon.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/global/dragon.png" width="300px" /></td>
+                </tr>
+            </table>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">Scene</td>
+                    <td style="text-align: center;">Direct</td>
+                    <td style="text-align: center;">Indirect</td>
+                    <td style="text-align: center;">Global</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Spheres</td>
+                    <td style="text-align: center;">56.3149</td>
+                    <td style="text-align: center;">2392.3283s</td>
+                    <td style="text-align: center;">2938.1447s</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Coil</td>
+                    <td style="text-align: center;">299.6095s</td>
+                    <td style="text-align: center;">6189.1887s</td>
+                    <td style="text-align: center;">8535.5318s</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Bunny</td>
+                    <td style="text-align: center;">235.4119s</td>
+                    <td style="text-align: center;">6896.2102s</td>
+                    <td style="text-align: center;">9242.2988s</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Dragon</td>
+                    <td style="text-align: center;">360.2659s</td>
+                    <td style="text-align: center;">8269.6768s</td>
+                    <td style="text-align: center;">10807.4796s</td>
+                </tr>
+            </table>
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">Number of bounces</td>
+                    <td style="text-align: center;">1</td>
+                    <td style="text-align: center;">2</td>
+                    <td style="text-align: center;">3</td>
+                    <td style="text-align: center;">4</td>
+                    <td style="text-align: center;">5</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Dragon unaccumulated</td>
+                    <td style="text-align: center;"><img src="images/unacc/dragon_1.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/dragon_2.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/dragon_3.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/dragon_4.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/dragon_5.png" width="200px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Dragon accumulated</td>
+                    <td style="text-align: center;"><img src="images/acc/dragon_1.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/dragon_2.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/dragon_3.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/dragon_4.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/dragon_5.png" width="200px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Bunny unaccumulated</td>
+                    <td style="text-align: center;"><img src="images/unacc/bunny_1.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/bunny_2.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/bunny_3.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/bunny_4.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/bunny_5.png" width="200px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Bunny accumulated</td>
+                    <td style="text-align: center;"><img src="images/acc/bunny_1.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/bunny_2.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/bunny_3.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/bunny_4.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/bunny_5.png" width="200px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Coil unaccumulated</td>
+                    <td style="text-align: center;"><img src="images/unacc/coil_1.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/coil_2.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/coil_3.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/coil_4.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/unacc/coil_5.png" width="200px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Coil accumulated</td>
+                    <td style="text-align: center;"><img src="images/acc/coil_1.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/coil_2.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/coil_3.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/coil_4.png" width="200px" /></td>
+                    <td style="text-align: center;"><img src="images/acc/coil_5.png" width="200px" /></td>
+                </tr>
+            </table>
+        </div>
+
+
+
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">Number of bounces</td>
+                    <td style="text-align: center;">Bunny</td>
+                    <td style="text-align: center;">Coil</td>
+                    <td style="text-align: center;">Dragon</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">1</td>
+                    <td style="text-align: center;"><img src="images/roulette/bunny_1.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/roulette/coil_1.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/roulette/dragon_1.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">2</td>
+                    <td style="text-align: center;"><img src="images/roulette/bunny_2.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/roulette/coil_2.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/roulette/dragon_2.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">3</td>
+                    <td style="text-align: center;"><img src="images/roulette/bunny_3.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/roulette/coil_3.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/roulette/dragon_3.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">4</td>
+                    <td style="text-align: center;"><img src="images/roulette/bunny_4.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/roulette/coil_4.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/roulette/dragon_4.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">100</td>
+                    <td style="text-align: center;"><img src="images/roulette/bunny_100.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/roulette/coil_100.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/roulette/dragon_100.png" width="300px" /></td>
+                </tr>
+            </table>
+        </div>
+
+
+
+
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">Sample count</td>
+                    <td style="text-align: center;">Bunny</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">1</td>
+                    <td style="text-align: center;"><img src="images/spp/bunny_1.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/dragon_1.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/coil_1.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">2</td>
+                    <td style="text-align: center;"><img src="images/spp/bunny_2.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/dragon_2.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/coil_2.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">4</td>
+                    <td style="text-align: center;"><img src="images/spp/bunny_4.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/dragon_4.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/coil_4.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">8</td>
+                    <td style="text-align: center;"><img src="images/spp/bunny_8.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/dragon_8.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/coil_8.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">16</td>
+                    <td style="text-align: center;"><img src="images/spp/bunny_16.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/dragon_16.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/coil_16.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">64</td>
+                    <td style="text-align: center;"><img src="images/spp/bunny_64.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/dragon_64.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/coil_64.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">1024</td>
+                    <td style="text-align: center;"><img src="images/spp/bunny_1024.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/dragon_1024.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/spp/coil_1024.png" width="300px" /></td>
+                </tr>
+            </table>
+        </div>
+
+
+
+        18:30
+
+        <h2>Part 5: Adaptive Sampling</h2>
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+        <h2>(Optional) Part 6: Extra Credit Opportunities</h2>
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+        <h2>Additional Notes (please remove)</h2>
+        <ul>
+            <li>You can also add code if you'd like as so: <code>code code code</code></li>
+            <li>
+                If you'd like to add math equations,
+                <ul>
+                    <li>You can write inline equations like so: \( a^2 + b^2 = c^2 \)</li>
+                    <li>You can write display equations like so: \[ a^2 + b^2 = c^2 \]</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script>
+        // automatically find and highlight all <pre><code class="language-cpp"> blocks
+        hljs.highlightAll();
+    </script>
+</body>
+</html>
