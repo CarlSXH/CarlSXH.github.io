@@ -42,8 +42,8 @@
         Link to GitHub repository: (TODO) <a href="https://cs184.eecs.berkeley.edu/sp25">cs184.eecs.berkeley.edu/sp25</a>
 
         <!--
-    We've already added one heading per part, to make your write-up as navigable when grading. Please fit your write-up within these sections!
-    -->
+        We've already added one heading per part, to make your write-up as navigable when grading. Please fit your write-up within these sections!
+        -->
 
         <h2>Overview</h2>
         <p>
@@ -466,39 +466,39 @@
         </p>
 
         <!--<div style="display: flex; flex-direction: column; align-items: center;">
-        <table style="width: 100%; text-align: center; border-collapse: collapse;">
-            <tr>
-                <td style="text-align: center;">Scene</td>
-                <td style="text-align: center;">Direct</td>
-                <td style="text-align: center;">Indirect</td>
-                <td style="text-align: center;">Global</td>
-            </tr>
-            <tr>
-                <td style="text-align: center;">Spheres</td>
-                <td style="text-align: center;">56.3149</td>
-                <td style="text-align: center;">2392.3283s</td>
-                <td style="text-align: center;">2938.1447s</td>
-            </tr>
-            <tr>
-                <td style="text-align: center;">Coil</td>
-                <td style="text-align: center;">299.6095s</td>
-                <td style="text-align: center;">6189.1887s</td>
-                <td style="text-align: center;">8535.5318s</td>
-            </tr>
-            <tr>
-                <td style="text-align: center;">Bunny</td>
-                <td style="text-align: center;">235.4119s</td>
-                <td style="text-align: center;">6896.2102s</td>
-                <td style="text-align: center;">9242.2988s</td>
-            </tr>
-            <tr>
-                <td style="text-align: center;">Dragon</td>
-                <td style="text-align: center;">360.2659s</td>
-                <td style="text-align: center;">8269.6768s</td>
-                <td style="text-align: center;">10807.4796s</td>
-            </tr>
-        </table>
-    </div>-->
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">Scene</td>
+                    <td style="text-align: center;">Direct</td>
+                    <td style="text-align: center;">Indirect</td>
+                    <td style="text-align: center;">Global</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Spheres</td>
+                    <td style="text-align: center;">56.3149</td>
+                    <td style="text-align: center;">2392.3283s</td>
+                    <td style="text-align: center;">2938.1447s</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Coil</td>
+                    <td style="text-align: center;">299.6095s</td>
+                    <td style="text-align: center;">6189.1887s</td>
+                    <td style="text-align: center;">8535.5318s</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Bunny</td>
+                    <td style="text-align: center;">235.4119s</td>
+                    <td style="text-align: center;">6896.2102s</td>
+                    <td style="text-align: center;">9242.2988s</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">Dragon</td>
+                    <td style="text-align: center;">360.2659s</td>
+                    <td style="text-align: center;">8269.6768s</td>
+                    <td style="text-align: center;">10807.4796s</td>
+                </tr>
+            </table>
+        </div>-->
 
         <p>
             Below, we have the same scenes with 1, 2, 3, 4, and 5 bounces, accumulated and unaccumulated.
@@ -767,6 +767,8 @@
             However, as we can see, even 64 rays per pixel offers very smooth quality image, so having batch size larger than 64 is not going to have a huge impact in the quality, unless we have much larger sample per pixel.
         </p>
 
+        <h2>Extra credit</h2>
+        In my implementation of BVH, I have kept all the primitives in a single vector and store the start and end using pointers.
 
         <h2>Acknowledgements</h2>
         I have used AI to make the writing a bit better.
