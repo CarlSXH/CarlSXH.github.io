@@ -23,10 +23,10 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+
         img {
             image-rendering: pixelated;
         }
-
     </style>
     </style>
 </head>
@@ -190,6 +190,7 @@
             <table style="width: 100%; text-align: center; border-collapse: collapse;">
                 <tr>
                     <td style="text-align: center;">File</td>
+                    <td style="text-align: center;">Number of triangles</td>
                     <td style="text-align: center;">Original time (s)</td>
                     <td style="text-align: center;">Test per ray</td>
                     <td style="text-align: center;">Optimized time (s)</td>
@@ -197,6 +198,7 @@
                 </tr>
                 <tr>
                     <td style="text-align: center;">Banana</td>
+                    <td style="text-align: center;">2458</td>
                     <td style="text-align: center;">6.8068</td>
                     <td style="text-align: center;">2458</td>
                     <td style="text-align: center;">0.308</td>
@@ -204,6 +206,7 @@
                 </tr>
                 <tr>
                     <td style="text-align: center;">building</td>
+                    <td style="text-align: center;">39506</td>
                     <td style="text-align: center;">1664.9704</td>
                     <td style="text-align: center;">39506</td>
                     <td style="text-align: center;">0.523</td>
@@ -211,6 +214,7 @@
                 </tr>
                 <tr>
                     <td style="text-align: center;">teapot</td>
+                    <td style="text-align: center;">2464</td>
                     <td style="text-align: center;">6.3835</td>
                     <td style="text-align: center;">2464</td>
                     <td style="text-align: center;">0.3096</td>
@@ -218,6 +222,7 @@
                 </tr>
                 <tr>
                     <td style="text-align: center;">cow</td>
+                    <td style="text-align: center;">5856</td>
                     <td style="text-align: center;">64.0496</td>
                     <td style="text-align: center;">5856</td>
                     <td style="text-align: center;">0.3623</td>
@@ -225,6 +230,7 @@
                 </tr>
                 <tr>
                     <td style="text-align: center;">beetle</td>
+                    <td style="text-align: center;">7558</td>
                     <td style="text-align: center;">110.1838</td>
                     <td style="text-align: center;">7558</td>
                     <td style="text-align: center;">0.2899</td>
@@ -232,6 +238,7 @@
                 </tr>
                 <tr>
                     <td style="text-align: center;">beast</td>
+                    <td style="text-align: center;">64618</td>
                     <td style="text-align: center;">2875.321</td>
                     <td style="text-align: center;">64618</td>
                     <td style="text-align: center;">0.3632</td>
@@ -239,6 +246,7 @@
                 </tr>
                 <tr>
                     <td style="text-align: center;">maxplanck</td>
+                    <td style="text-align: center;">50801</td>
                     <td style="text-align: center;">2275.7349</td>
                     <td style="text-align: center;">50801</td>
                     <td style="text-align: center;">0.5132</td>
@@ -246,6 +254,7 @@
                 </tr>
                 <tr>
                     <td style="text-align: center;">peter</td>
+                    <td style="text-align: center;">40018</td>
                     <td style="text-align: center;">1823.7381</td>
                     <td style="text-align: center;">40018</td>
                     <td style="text-align: center;">0.4072</td>
@@ -253,6 +262,7 @@
                 </tr>
                 <tr>
                     <td style="text-align: center;">bench</td>
+                    <td style="text-align: center;">67808</td>
                     <td style="text-align: center;">3176.3173</td>
                     <td style="text-align: center;">67808</td>
                     <td style="text-align: center;">0.2241</td>
@@ -261,8 +271,8 @@
             </table>
         </div>
         <p>
-            As we can see, without BVH, we need to test each ray against every primitive in the scene.
-            However, with BVH, the number of test per ray decreases significantly to depend on the scene specifically rather than the number of primitive.
+            As we can see, without BVH, we need to test each ray against every primitive in the scene, and the time spent rendering is about linear to the number of triangles in the scene.
+            However, with BVH, the number of test per ray decreases significantly to depend more on the scene rather than the number of primitive.
         </p>
 
 
@@ -389,11 +399,22 @@
         </div>
         <p>
             As we can see, lighting sampling converges a lot faster than hemisphere sampling, as with 64 samples, the shadow is already really smooth, whereas hemisphere sampling is still really noisy with mant black pixels.
-            Another difference is that, for areas that aren't in the shadow, lighting sampling will always be bright even with one pixel, whereas the scene is barely comprehensible for hemisphere sampling with one sample per pixel.
+            Another difference is that, lighting sampling is noisier for shady areas and much less noisy for areas completely visible to light, whereas for hemisphere sampling the noise is equally prevalent everywhere.
+            This is a desirable feature as it means that lighting sampling is noisier for places that is harder to decide whether it's directly lit by light, and the difference in noise means that we are able to incoperate adaptive sampling.
         </p>
 
         <h2>Part 4: Global Illumination</h2>
-        Here are some scenes rendered with 5 bounces and 1024 samples per pixel, and we have also decomposed them into the direct and indirect illuminations:
+        Now, we incoperate indirect lighting to achieve global illumination.
+        <p>
+            For this, we will use the depth of the ray to record how many bounces we will ultimately recursively perform.
+            Specifically, suppose we are at a point \(P\) with the material given by some bidirectional scattering distribution function (BSDF) function.
+            If the depth is 1, we have reached the base case and we simply return the one bounce lighting from part 3.
+            Otherwise, we sample a potential incoming direction \(D\) into \(P\) using the BSDF function, compute the intersection \(P'\) of the ray originating from \(P\) in the direction of \(-D\), obtain the BSDF of the material of the intersection, and recursively evaluate the radiance coming from \(P'\) in the direction \(D\).
+            Lastly, we multiply the BSDF, along with the cosine of the angle between the normal at \(P\) and \(-D\), divided by the probability density of \(D\), to obtain the final sample of the radiance at \(P\).
+        </p>
+        <p>
+            Below are some scenes rendered with 5 bounces and 1024 samples per pixel, and we have also decomposed them into the direct and indirect illuminations:
+        </p>
 
         <div style="display: flex; flex-direction: column; align-items: center;">
             <table style="width: 100%; text-align: center; border-collapse: collapse;">
@@ -429,41 +450,45 @@
                 </tr>
             </table>
         </div>
-        <div style="display: flex; flex-direction: column; align-items: center;">
-            <table style="width: 100%; text-align: center; border-collapse: collapse;">
-                <tr>
-                    <td style="text-align: center;">Scene</td>
-                    <td style="text-align: center;">Direct</td>
-                    <td style="text-align: center;">Indirect</td>
-                    <td style="text-align: center;">Global</td>
-                </tr>
-                <tr>
-                    <td style="text-align: center;">Spheres</td>
-                    <td style="text-align: center;">56.3149</td>
-                    <td style="text-align: center;">2392.3283s</td>
-                    <td style="text-align: center;">2938.1447s</td>
-                </tr>
-                <tr>
-                    <td style="text-align: center;">Coil</td>
-                    <td style="text-align: center;">299.6095s</td>
-                    <td style="text-align: center;">6189.1887s</td>
-                    <td style="text-align: center;">8535.5318s</td>
-                </tr>
-                <tr>
-                    <td style="text-align: center;">Bunny</td>
-                    <td style="text-align: center;">235.4119s</td>
-                    <td style="text-align: center;">6896.2102s</td>
-                    <td style="text-align: center;">9242.2988s</td>
-                </tr>
-                <tr>
-                    <td style="text-align: center;">Dragon</td>
-                    <td style="text-align: center;">360.2659s</td>
-                    <td style="text-align: center;">8269.6768s</td>
-                    <td style="text-align: center;">10807.4796s</td>
-                </tr>
-            </table>
-        </div>
 
+        <!--<div style="display: flex; flex-direction: column; align-items: center;">
+        <table style="width: 100%; text-align: center; border-collapse: collapse;">
+            <tr>
+                <td style="text-align: center;">Scene</td>
+                <td style="text-align: center;">Direct</td>
+                <td style="text-align: center;">Indirect</td>
+                <td style="text-align: center;">Global</td>
+            </tr>
+            <tr>
+                <td style="text-align: center;">Spheres</td>
+                <td style="text-align: center;">56.3149</td>
+                <td style="text-align: center;">2392.3283s</td>
+                <td style="text-align: center;">2938.1447s</td>
+            </tr>
+            <tr>
+                <td style="text-align: center;">Coil</td>
+                <td style="text-align: center;">299.6095s</td>
+                <td style="text-align: center;">6189.1887s</td>
+                <td style="text-align: center;">8535.5318s</td>
+            </tr>
+            <tr>
+                <td style="text-align: center;">Bunny</td>
+                <td style="text-align: center;">235.4119s</td>
+                <td style="text-align: center;">6896.2102s</td>
+                <td style="text-align: center;">9242.2988s</td>
+            </tr>
+            <tr>
+                <td style="text-align: center;">Dragon</td>
+                <td style="text-align: center;">360.2659s</td>
+                <td style="text-align: center;">8269.6768s</td>
+                <td style="text-align: center;">10807.4796s</td>
+            </tr>
+        </table>
+    </div>-->
+
+        <p>
+            Below, we have the same scenes with 1, 2, 3, 4, and 5 bounces, accumulated and unaccumulated.
+        </p>
         <div style="display: flex; flex-direction: column; align-items: center;">
             <table style="width: 100%; text-align: center; border-collapse: collapse;">
                 <tr>
@@ -524,8 +549,17 @@
                 </tr>
             </table>
         </div>
+        <p>
+            For the second bounce, we see that the area not visible to light are getting lit by indirect lighting, and the overall appearence of the object is much more visually appealing than having only one bounce.
+            Further, we see red and blue from the wall getting bounced to the object.
+            For the third bounce, we see even more of that, and it's especially apparent in dragon, where the area below the neck and the bent part of the body is getting lit by indirect lighting.
+            This image is of much higher quality than traditional rasterization and it feels a lot more natural than the flat, constraint, dark feeling of rasterized image.
+        </p>
 
 
+        <p>
+            Here, we set the stopping probability to be 0.2 for Russian Roulette, and here are the images rendered with 1, 2, 3, 4, 100 bounces.
+        </p>
 
         <div style="display: flex; flex-direction: column; align-items: center;">
             <table style="width: 100%; text-align: center; border-collapse: collapse;">
@@ -567,10 +601,15 @@
                 </tr>
             </table>
         </div>
+        <p>
+            The time it takes for 3, 4, or 100 bounces are roughly the same, which is to be expected since higher bounces are exponentially less likely.
+            However, the noise it produces for higher bounces is more prevalent and needs more sampling to control.
+        </p>
 
 
-
-
+        <p>
+            Here are the same scenes rendered with 1, 2, 4, 8, 16, 64, 1024 samples per pixel with 4 light rays.
+        </p>
         <div style="display: flex; flex-direction: column; align-items: center;">
             <table style="width: 100%; text-align: center; border-collapse: collapse;">
                 <tr>
@@ -621,16 +660,37 @@
                 </tr>
             </table>
         </div>
+        <p>
+            As we can see, the image gets cleaner and less noisy with more samples.
+            Moreover, as we can see from the first image, areas that are directly lit by light isn't as noisy, since indirect lights don't contribute as much, and areas like the corners on the ceiling, below the neck of the bunny and dragon, and the bottom part of the coil, are really noisy since the main contribution are from indirect lighting.
+            Furthermore, the noise isn't completely random either: they're gray scale pixels coming from walls, red pixels from left walls, and blue pixels from right walls, all mixed together in a random fashion and gets less noisy as the number of samples increases.
+            From the last image, we can see the area that are the most noisy, which are the corners of the ceiling, since they are still slightly noisy after 1024 samples, and they still have the lossy compression features of images
+        </p>
 
 
-
-        18:30
 
         <h2>Part 5: Adaptive Sampling</h2>
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+        As we have eluded in previous sections, some parts of the scene have major contribution from one light source and isn't noisy even with very small number of samples, whereas more occluded areas need a lot more samples to be less noisy.
+        To combat against this, we use adaptive sampling, where we dynamically judge if a pixel has converged using statistical methods.
+        <p>
+            Specifically, given n samples \(x_1,x_2,\dots,x_n\), we can calculate their mean \(\mu\) and sample standard deviation \(\sigma\), and we will assume that the mean has converged if \(1.96\sigma/\sqrt{n}\leq\varepsilon\mu\) where \(\varepsilon\) is a variable for max tolerance.
+            The 1.96 is half of the width in the normal distribution such that the area is 95% of the total area, and \(\varepsilon\) is measuring the relative error, and this test is the statistical test of confidence interval, and we're testing whether we're 95% certain the relative error of the samples is less than 0.05.
+        </p>
+        <p>
+            To actually efficiently compute \(\mu\) and \(\sigma\), instead we compute the intermediate values
+            \(s_i=\sum_{k=1}^nx_k^i\), then \(\mu\) can be evaluated to be \(\mu=s_1/n\) and \(\sigma^2=(s_2-s_1^2/n)/(n-1)\).
+            This is much more efficient since \(s_1,s_2\) can be accumulated after each sample.
+            Finally, we check whether the condition after every <code>samplesPerBatch</code> samples, and terminate the sampling after the condition has been satisfied.
+        </p>
+        <p>
+            After we have 
+        </p>
 
         <h2>(Optional) Part 6: Extra Credit Opportunities</h2>
         Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+
+        18:30
 
         <h2>Additional Notes (please remove)</h2>
         <ul>
