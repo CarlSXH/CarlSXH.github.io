@@ -52,6 +52,10 @@
             Then, we implemented one level of ray tracing, or direct illumination, by performing hemisphere based or lighting based sampling.
             Using direct illumination, we recursively sample rays to implement the full global illumination, and finally we perform the final optimization by implementing Russian roulette termination with adaptive sampling.
         </p>
+        <p>
+            An interesting thing I've learned is how much BVH speedsup the computation, it's way more drastic than I imagined.
+            Some things I've learned is that, for rendering an image that takes a long time, it's essential to check if all the parameters are correct, especially the folder location.
+        </p>
 
 
         <h2>Part 1: Ray Generation and Scene Intersection</h2>
@@ -70,13 +74,13 @@
         </p>
         <p>
             For ray and triangle intersection, we used Möller Trumbore Algorithm.
-            In this algorithm, we incoperate the ray equation into the calculation of the barycentric coordinate, then we check through the barycentric coordinate whether it is inside the triangle.
+            In this algorithm, we incorperate the ray equation into the calculation of the barycentric coordinate, then we check through the barycentric coordinate whether it is inside the triangle.
             Specifically, we solve the following equation:
             \[\vec{O}+t\vec{D}=w\vec{P_1}+u\vec{P_2}+v\vec{P_3},\]
             where \(\vec{O}\) is the start of the ray, \(\vec{D}\) is the direction of the ray, \(\vec{P_1},\vec{P_2},\vec{P_3}\) are the three points of the triangle, and \(u,v,w\) are clearly the barycentric coordinate of the intersection of the ray with the plane defined by the three points, with the obvious constraint \(u+v+w=1\).
             Substituting this in, we have
             \[\vec{O}+t\vec{D}=(1-u-v)\vec{P_1}+u\vec{P_2}+v\vec{P_3}=\vec{P_1}+u(\vec{P_2}-\vec{P_1})+v(\vec{P_3}-\vec{P_1}).\]
-            Then, rearranging he unknowns to the left hand side, we have
+            Then, rearranging the unknowns to the left hand side, we have
             \[t\vec{D}-u(\vec{P_2}-\vec{P_1})-v(\vec{P_3}-\vec{P_1})=\vec{P_1}-\vec{O}.\]
             Solving this linear system of equations, we obtain
             \[\begin{bmatrix}t\\u\\v\end{bmatrix}=\frac{1}{\vec{S}_1\cdot\vec{E}_1}\begin{bmatrix}\vec{S}_2\cdot\vec{E}_2\\\vec{S}_1\cdot\vec{S}\\ \vec{S}_2\cdot\vec{D}\end{bmatrix}\]
@@ -95,7 +99,9 @@
             Suppose the sphere has center \(\vec{C}\) and radius \(R\), then the sphere is defined by \((\vec{X}-\vec{C})\cdot(\vec{X}-\vec{C})=R^2\).
             Substituting in the ray equation, we have \((\vec{O}+t\vec{D}-\vec{C})\cdot(\vec{O}+t\vec{D}-\vec{C})=R^2\), which simplifies to
             \[(\vec{D}\cdot\vec{D})t^2+(2(\vec{O}-\vec{C})\cdot\vec{D})t+(\vec{O}-\vec{C})\cdot(\vec{O}-\vec{C})-R^2=0.\]
-            This is a quadratic equation in \(t\), which we can solve using the quadratic formula.
+            This is a quadratic equation in \(t\), which we know how to solve.
+            If the discriminant, i.e. \(b^2-4ac\), is negative, then there is no intersection.
+            Otherwise, we solve this using the quadratic formula to obtain two roots in time, and we pick the first time that is within the time range of the ray.
         </p>
         <p>
             With ray generation and primitive intersection that returns the material and the normal, we are able to get the following images:
@@ -348,6 +354,10 @@
                 </tr>
             </table>
         </div>
+        <p>
+            As we can see, even with one sample per pixel, the shape of the soft shadow is already somewhat visible, and for 4 samples it's already smooth from far away.
+            With just 64 samples, the shadow is already really smooth.
+        </p>
 
         <p>
             Now, to compare the hemisphere sampling with lighting sampling, we rendered the same scene with increasing number of samples per pixel.
@@ -409,7 +419,7 @@
             For this, we will use the depth of the ray to record how many bounces we will ultimately recursively perform.
             Specifically, suppose we are at a point \(P\) with the material given by some bidirectional scattering distribution function (BSDF) function.
             If the depth is 1, we have reached the base case and we simply return the one bounce lighting from part 3.
-            Otherwise, we sample a potential incoming direction \(D\) into \(P\) using the BSDF function, compute the intersection \(P'\) of the ray originating from \(P\) in the direction of \(-D\), obtain the BSDF of the material of the intersection, and recursively evaluate the radiance coming from \(P'\) in the direction \(D\).
+            Otherwise, we sample a potential incoming direction \(D\) into \(P\), compute the intersection \(P'\) of the ray originating from \(P\) in the direction of \(-D\), obtain the BSDF of the material of the intersection, and recursively evaluate the radiance coming from \(P'\) in the direction \(D\).
             Lastly, we multiply the BSDF, along with the cosine of the angle between the normal at \(P\) and \(-D\), divided by the probability density of \(D\), to obtain the final sample of the radiance at \(P\).
         </p>
         <p>
@@ -450,6 +460,10 @@
                 </tr>
             </table>
         </div>
+        <p>
+            Here, we see, as indicated by the name, that the indirect lighting are all the lit area that aren't directly shined by a light source, like under the bunny, under the dragon, inside the dragon's mouth, etc.
+            With the indirect lights, the image looks a lot more visually appealing, and we see the color of the walls on the objects, as real world objects would.
+        </p>
 
         <!--<div style="display: flex; flex-direction: column; align-items: center;">
         <table style="width: 100%; text-align: center; border-collapse: collapse;">
@@ -683,7 +697,7 @@
             Finally, we check whether the condition after every <code>samplesPerBatch</code> samples, and terminate the sampling after the condition has been satisfied.
         </p>
         <p>
-            After we have implemented this, we get the following results:
+            After we have implemented this, we get the following results when we set the max tolerance to be 0.05, ray depth to be 5, and sample per pixel to be 2048:
         </p>
         <div style="display: flex; flex-direction: column; align-items: center;">
             <table style="width: 100%; text-align: center; border-collapse: collapse;">
@@ -710,8 +724,53 @@
                 </tr>
             </table>
         </div>
+        <p>
+            Here's what we get if we set a higher max tolerance.
+            For simplicity, we also set the batch size to be 1.
+        </p>
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <table style="width: 100%; text-align: center; border-collapse: collapse;">
+                <tr>
+                    <td style="text-align: center;">Rate</td>
+                    <td style="text-align: center;">Spheres</td>
+                    <td style="text-align: center;">Coil</td>
+                    <td style="text-align: center;">Bunny</td>
+                    <td style="text-align: center;">Dragon</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">0.5</td>
+                    <td style="text-align: center;"><img src="images/ada_05/spheres.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/ada_05/coil.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/ada_05/bunny.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/ada_05/dragon.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">0.2</td>
+                    <td style="text-align: center;"><img src="images/ada_02/spheres.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/ada_02/coil.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/ada_02/bunny.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/ada_02/dragon.png" width="300px" /></td>
+                </tr>
+                <tr>
+                    <td style="text-align: center;">0.1</td>
+                    <td style="text-align: center;"><img src="images/ada_01/spheres.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/ada_01/coil.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/ada_01/bunny.png" width="300px" /></td>
+                    <td style="text-align: center;"><img src="images/ada_01/dragon.png" width="300px" /></td>
+                </tr>
+            </table>
+        </div>
+        <p>
+            As we can see, with smaller max tolerance, the image gets clearer and clearer.
+            One major issue of this method, as we can see above, is that many pixels exit early due to two bounces towards the void, creating black pixels.
+            To combat this, we need to set the batch size to be larger.
+            However, as we can see, even 64 rays per pixel offers very smooth quality image, so having batch size larger than 64 is not going to have a huge impact in the quality, unless we have much larger sample per pixel.
+        </p>
 
-        18:30
+
+        <h2>Acknowledgements</h2>
+        I have used AI to make the writing a bit better.
+
 
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
