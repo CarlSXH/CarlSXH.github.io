@@ -298,37 +298,9 @@ Vector3D Vertex::normal(void) const {
 		<p>
 			In this task, given two adjacent triangles sharing an edge, we want to flip the edge so that it's connecting the other vertex in each triangle, effectively flipping the edge.
 			Since we store everything as iterators of lists, we are effectively storing pointers, so we can effectively just first record all the points, then set the values of the iterators in any order.
-			Specifically, we have the following code
+			For the code, we obtain the pointers to all the necessary half-edges, faces, and vertices, and we name them according to the figure for convenience, then we just set the values one by one.
 		</p>
-<pre><code class="language-cpp">
-EdgeIter HalfedgeMesh::flipEdge(EdgeIter e0) {
-    HalfedgeIter bc = e0->getEdge()->halfedge();
-    HalfedgeIter ca = bc->next(), ab = ca->next();
-    HalfedgeIter cb = bc->twin(), bd = cb->next(), dc = bd->next();
-	
-    FaceIter f1 = bc->face(), f2 = cb->face();
-    if (f2->isBoundary())
-        return e0;
-
-    VertexIter b = bc->vertex(), c = ca->vertex(), a = ab->vertex(), d = dc->vertex();
-
-    bc->next() = dc; dc->next() = ca; ca->next() = bc;
-    cb->next() = ab; ab->next() = bd; bd->next() = cb;
-
-    bc->face() = f1; dc->face() = f1; ca->face() = f1;
-    cb->face() = f2; ab->face() = f2; bd->face() = f2;
-
-    bc->vertex() = a; cb->vertex() = d;
-
-    f1->halfedge() = bc; f2->halfedge() = cb;
-
-    c->halfedge() = ca; b->halfedge() = bd;
-
-    return e0;
-}
-</code></pre>
 		<p>
-			Here, we see that we first obtain the pointers to all the necessary half-edges, faces, and vertices, and we name them according to the figure for convenience, then we just set the values one by one.
 			The final result is as follows:
 		</p>
 		<figure>
@@ -340,50 +312,8 @@ EdgeIter HalfedgeMesh::flipEdge(EdgeIter e0) {
 		<p>
 			For this task, we want to split an edge by the middle, create a new vertex, and connect the vertex to the other two vertices.
 			Similarly to the previous task, we first obtain all the necessary pointers, then we create the new vertex, two new half-edges, and one new edge, and we connect everything together.
-			Again for the code, we see that if we name everything according to its name in the illustration, it's easy to tell what each field of the half-edge should be set to:
+			Again for the code, we see that if we name everything according to its name in the illustration, it's easy to tell what each field of the half-edge should be set to.
 		</p>
-<pre><code class="language-cpp">
-VertexIter HalfedgeMesh::splitEdge(EdgeIter e0) {
-    if (e0->isBoundary()) {
-        // boundary case
-    }
-
-    HalfedgeIter bc = e0->getEdge()->halfedge(), bm = bc, ca = bc->next(), ab = ca->next();
-    HalfedgeIter cb = bc->twin(), cm = cb, bd = cb->next(), dc = bd->next();
-
-    VertexIter b = bc->vertex(), c = ca->vertex(), a = ab->vertex(), d = dc->vertex();
-    VertexIter m = newVertex();
-
-    EdgeIter emc = e0;
-    EdgeIter ema = newEdge(), emd = newEdge(), emb = newEdge();
-
-    FaceIter fab = bc->face(), fdc = cb->face();
-    FaceIter fca = newFace(), fbd = newFace();
-    
-    HalfedgeIter am = newHalfedge(), ma = newHalfedge(), mc = newHalfedge();
-    HalfedgeIter mb = newHalfedge(), md = newHalfedge(), dm = newHalfedge();
-
-    m->halfedge() = ma;
-    m->position = (bc->vertex()->position + cb->vertex()->position) / 2;
-
-    ema->halfedge() = ma; emb->halfedge() = mb; emc->halfedge() = mc; emd->halfedge() = md;
-    fab->halfedge() = ab; fdc->halfedge() = dc; fca->halfedge() = ca; fbd->halfedge() = bd;
-
-    am->setNeighbors(mc, ma, a, ema, fca);
-    ma->setNeighbors(ab, am, m, ema, fab);
-    mc->setNeighbors(ca, cm, m, emc, fca);
-    mb->setNeighbors(bd, bm, m, emb, fbd);
-    md->setNeighbors(dc, dm, m, emd, fdc);
-    dm->setNeighbors(mb, md, d, emd, fbd);
-    cm->setNeighbors(md, mc, c, emc, fdc);
-    bm->setNeighbors(ma, mb, b, emb, fab);
-
-    ab->next() = bm; bd->next() = dm; dc->next() = cm; ca->next() = am;
-    ca->face() = fca; ab->face() = fab; bd->face() = fbd; dc->face() = fdc;
-
-    return m;
-}
-</code></pre>
 		<p>
 			Here is the result after splitting arbitrarily along many different edges:
 		</p>
